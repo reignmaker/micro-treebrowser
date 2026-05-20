@@ -1,0 +1,17 @@
+[
+  {
+    "Name": "treebrowser",
+    "Description": "File tree browser with preview navigation for micro.",
+    "Website": "local",
+    "Tags": ["files", "tree", "browser"],
+    "Versions": [
+      {
+        "Version": "0.1.0",
+        "Url": "local",
+        "Require": {
+          "micro": ">=2.0.0"
+        }
+      }
+    ]
+  }
+]
