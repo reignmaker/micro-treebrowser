@@ -88,16 +88,60 @@ local function is_dir(path)
     return info:IsDir()
 end
 
-local function activate_pane(pane)
+local function pane_id(pane)
     if pane == nil then
-        return
+        return nil
+    end
+    local ok, id = pcall(function()
+        return pane:ID()
+    end)
+    if not ok then
+        return nil
+    end
+    return id
+end
+
+local function active_pane_matches(id)
+    local current = micro.CurPane()
+    if current == nil then
+        return false
+    end
+    return pane_id(current) == id
+end
+
+local function pane_index(pane)
+    local id = pane_id(pane)
+    if id == nil then
+        return nil
     end
     local tab = micro.CurTab()
     if tab ~= nil then
-        tab:SetActive(tab:GetPane(pane:ID()))
+        local index = tab:GetPane(id)
+        tab:SetActive(index)
+        if active_pane_matches(id) then
+            return index
+        end
+        return nil
+    end
+    return 0
+end
+
+local function activate_pane(pane)
+    local index = pane_index(pane)
+    if index == nil then
+        return false
+    end
+    local tab = micro.CurTab()
+    if tab ~= nil then
+        tab:SetActive(index)
     else
         pane:SetActive(true)
     end
+    return true
+end
+
+local function pane_alive(pane)
+    return pane_index(pane) ~= nil
 end
 
 local function clear_tree_buffer()
@@ -200,7 +244,11 @@ end
 
 local function ensure_target()
     if target_pane ~= nil and target_pane ~= tree_pane then
-        return target_pane
+        if pane_alive(target_pane) then
+            return target_pane
+        end
+        target_pane = nil
+        target_path = nil
     end
     local current = micro.CurPane()
     if current ~= nil and current ~= tree_pane then
@@ -396,7 +444,14 @@ local function close_non_tree_or_tree()
         return
     end
 
+    forget_pane(pane)
     pane:Quit()
+    micro.After(10 * time.Millisecond, function()
+        if target_pane == pane then
+            target_pane = nil
+            target_path = nil
+        end
+    end)
 end
 
 function toggle_tree()
