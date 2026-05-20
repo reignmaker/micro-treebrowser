@@ -28,6 +28,10 @@ local rendering_tree = false
 
 local TREE_WIDTH = 32
 local DOUBLE_CLICK_NS = 500000000
+local ROOT_ROW = 0
+local SEPARATOR_ROW = 1
+local PARENT_ROW = 2
+local ENTRY_START_ROW = 3
 
 local function basename(path)
     return filepath.Base(path)
@@ -155,6 +159,14 @@ local function append_line(y, text, newline)
     tree_pane.Buf:insert(buffer.Loc(0, y), text)
 end
 
+local function separator_line()
+    return string.rep("-", TREE_WIDTH)
+end
+
+local function last_tree_row()
+    return #entries + ENTRY_START_ROW - 1
+end
+
 local function add_entry(path, depth, dir)
     entries[#entries + 1] = {
         path = path,
@@ -195,13 +207,16 @@ local function selected_entry()
         return nil
     end
     local y = tree_pane.Cursor.Loc.Y
-    if y == 0 then
+    if y == ROOT_ROW then
         return { path = root_dir, dir = true, root = true }
     end
-    if y == 1 then
+    if y == SEPARATOR_ROW then
+        return nil
+    end
+    if y == PARENT_ROW then
         return { path = parent_dir(root_dir), dir = true, parent = true }
     end
-    return entries[y - 1]
+    return entries[y - ENTRY_START_ROW + 1]
 end
 
 local function render()
@@ -215,8 +230,9 @@ local function render()
 
     rendering_tree = true
     clear_tree_buffer()
-    append_line(0, root_label(root_dir), true)
-    append_line(1, "../", #entries > 0)
+    append_line(ROOT_ROW, root_label(root_dir), true)
+    append_line(SEPARATOR_ROW, separator_line(), true)
+    append_line(PARENT_ROW, "../", #entries > 0)
     for i = 1, #entries do
         local entry = entries[i]
         local prefix = string.rep("  ", entry.depth - 1)
@@ -224,15 +240,18 @@ local function render()
         if entry.dir then
             marker = expanded[entry.path] and "- " or "+ "
         end
-        append_line(i + 1, prefix .. marker .. basename(entry.path) .. (entry.dir and "/" or ""), i < #entries)
+        append_line(i + ENTRY_START_ROW - 1, prefix .. marker .. basename(entry.path) .. (entry.dir and "/" or ""), i < #entries)
     end
     rendering_tree = false
 
-    if old_y > #entries + 1 then
-        old_y = #entries + 1
+    if old_y > last_tree_row() then
+        old_y = last_tree_row()
     end
     if old_y < 0 then
         old_y = 0
+    end
+    if old_y == SEPARATOR_ROW then
+        old_y = PARENT_ROW
     end
     tree_pane.Cursor.Loc.Y = old_y
     tree_pane.Cursor.Loc.X = 0
@@ -381,15 +400,22 @@ local function toggle_dir_selection()
     end
 end
 
-local function select_after_move()
+local function select_after_move(direction)
     if tree_pane == nil then
         return
     end
     if tree_pane.Cursor.Loc.Y < 0 then
         tree_pane.Cursor.Loc.Y = 0
     end
-    if tree_pane.Cursor.Loc.Y > #entries + 1 then
-        tree_pane.Cursor.Loc.Y = #entries + 1
+    if tree_pane.Cursor.Loc.Y > last_tree_row() then
+        tree_pane.Cursor.Loc.Y = last_tree_row()
+    end
+    if tree_pane.Cursor.Loc.Y == SEPARATOR_ROW then
+        if direction ~= nil and direction < 0 then
+            tree_pane.Cursor.Loc.Y = ROOT_ROW
+        else
+            tree_pane.Cursor.Loc.Y = PARENT_ROW
+        end
     end
     tree_pane.Cursor.Loc.X = 0
     tree_pane.Cursor:Relocate()
@@ -518,16 +544,18 @@ function preQuitAll(bp)
     close_tree()
 end
 
-function onCursorUp(bp)
+function preCursorUp(bp)
     if bp == tree_pane then
-        select_after_move()
+        tree_pane.Cursor:Up()
+        select_after_move(-1)
+        return false
     end
 end
 
 function preCursorDown(bp)
     if bp == tree_pane then
         tree_pane.Cursor:Down()
-        select_after_move()
+        select_after_move(1)
         return false
     end
 end
