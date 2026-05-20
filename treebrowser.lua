@@ -274,6 +274,16 @@ local function restore_tree_focus()
     end
 end
 
+local function resize_tree_pane()
+    if tree_pane ~= nil then
+        tree_pane:ResizePane(TREE_WIDTH)
+        local tab = micro.CurTab()
+        if tab ~= nil then
+            tab:Resize()
+        end
+    end
+end
+
 local function focus_target_pane()
     if target_pane ~= nil and target_pane ~= tree_pane then
         activate_pane(target_pane)
@@ -317,6 +327,7 @@ local function load_file(path, focus_file)
         pane = tree_pane:VSplitIndex(newbuf, true)
         target_pane = pane
         target_path = path
+        resize_tree_pane()
     elseif pane.Buf ~= nil and pane.Buf:Modified() and target_path ~= path then
         pane = pane:VSplitIndex(newbuf, true)
         target_pane = pane
@@ -409,7 +420,7 @@ local function open_tree(path)
     tree_pane.Buf.Type.Kind = buffer.BTScratch
     tree_pane.Buf.Type.Scratch = true
     tree_pane.Buf.Type.Syntax = false
-    tree_pane:ResizePane(TREE_WIDTH)
+    resize_tree_pane()
 
     tree_pane.Buf:SetOption("ruler", "false")
     tree_pane.Buf:SetOption("statusline", "false")
